@@ -76,11 +76,11 @@ codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ROOT_DIR/dist/MaosRec-macOS-10.15-Intel.zip"
 
 DMG_ROOT="$ROOT_DIR/.build/dmg-root"
-DMG_MOUNT="$ROOT_DIR/.build/dmg-mount"
+DMG_MOUNT="/Volumes/Maos Record"
 DMG_RW="$ROOT_DIR/.build/MaosRec-rw.dmg"
 DMG_OUTPUT="$ROOT_DIR/dist/MaosRec-macOS-10.15-Intel.dmg"
-rm -rf "$DMG_ROOT" "$DMG_MOUNT" "$DMG_RW" "$DMG_OUTPUT"
-mkdir -p "$DMG_ROOT/.background" "$DMG_MOUNT"
+rm -rf "$DMG_ROOT" "$DMG_RW" "$DMG_OUTPUT"
+mkdir -p "$DMG_ROOT/.background"
 cp -R "$APP_DIR" "$DMG_ROOT/"
 ln -s /Applications "$DMG_ROOT/Applications"
 cp "$ROOT_DIR/Resources/DMGBackground.png" "$DMG_ROOT/.background/DMGBackground.png"
@@ -97,11 +97,11 @@ DMG_DEVICE="$(
   hdiutil attach "$DMG_RW" \
     -readwrite \
     -noverify \
-    -noautoopen \
-    -mountpoint "$DMG_MOUNT" |
+    -noautoopen |
     awk '/Apple_HFS/ { print $1; exit }'
 )"
 test -n "$DMG_DEVICE"
+test -d "$DMG_MOUNT"
 
 cleanup_dmg() {
   if [[ -n "${DMG_DEVICE:-}" ]]; then
@@ -137,7 +137,6 @@ sync
 hdiutil detach "$DMG_DEVICE"
 DMG_DEVICE=""
 trap - EXIT
-rm -rf "$DMG_MOUNT"
 
 hdiutil convert "$DMG_RW" -format UDZO -imagekey zlib-level=9 -o "$DMG_OUTPUT"
 rm -f "$DMG_RW"
