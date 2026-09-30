@@ -108,6 +108,18 @@ cleanup_dmg() {
     hdiutil detach "$DMG_DEVICE" >/dev/null 2>&1 || hdiutil detach -force "$DMG_DEVICE" >/dev/null 2>&1 || true
   fi
 }
+
+detach_dmg() {
+  local attempt
+  for attempt in 1 2 3; do
+    if hdiutil detach "$DMG_DEVICE"; then
+      return 0
+    fi
+    sleep 2
+  done
+  hdiutil detach -force "$DMG_DEVICE"
+}
+
 trap cleanup_dmg EXIT
 
 osascript <<'APPLESCRIPT'
@@ -134,7 +146,7 @@ end tell
 APPLESCRIPT
 
 sync
-hdiutil detach "$DMG_DEVICE"
+detach_dmg
 DMG_DEVICE=""
 trap - EXIT
 
