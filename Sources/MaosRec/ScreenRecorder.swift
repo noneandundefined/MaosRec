@@ -116,9 +116,15 @@ final class ScreenRecorder: NSObject {
 
     func start(configuration: RecordingConfiguration, outputURL: URL) throws {
         guard writer == nil else { return }
-        if #available(macOS 10.15, *), !CGPreflightScreenCaptureAccess() {
-            CGRequestScreenCaptureAccess()
-            throw RecorderError.screenPermissionDenied
+        // Although these CoreGraphics permission APIs were declared available
+        // in the macOS 10.15 SDK, some Catalina releases do not export them.
+        // Calling them on Catalina can crash at runtime. Let AVCaptureScreenInput
+        // use Catalina's native Screen Recording permission flow instead.
+        if #available(macOS 11.0, *) {
+            if !CGPreflightScreenCaptureAccess() {
+                CGRequestScreenCaptureAccess()
+                throw RecorderError.screenPermissionDenied
+            }
         }
 
         self.configuration = configuration
