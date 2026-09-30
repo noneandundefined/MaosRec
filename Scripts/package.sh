@@ -30,15 +30,25 @@ plutil -lint "$APP_DIR/Contents/Info.plist"
 
 ICONSET="$ROOT_DIR/.build/MaosRec.iconset"
 rm -rf "$ICONSET"
-swift "$ROOT_DIR/Scripts/generate_icon.swift" "$ICONSET"
-for icon in \
-  icon_16x16.png icon_16x16@2x.png \
-  icon_32x32.png icon_32x32@2x.png \
-  icon_128x128.png icon_128x128@2x.png \
-  icon_256x256.png icon_256x256@2x.png \
-  icon_512x512.png icon_512x512@2x.png; do
-  test -s "$ICONSET/$icon"
-done
+mkdir -p "$ICONSET"
+ICON_SOURCE="$ROOT_DIR/Resources/AppIcon.png"
+test -s "$ICON_SOURCE"
+
+while read -r name pixels; do
+  sips -z "$pixels" "$pixels" "$ICON_SOURCE" --out "$ICONSET/$name" >/dev/null
+  test -s "$ICONSET/$name"
+done <<'ICON_SIZES'
+icon_16x16.png 16
+icon_16x16@2x.png 32
+icon_32x32.png 32
+icon_32x32@2x.png 64
+icon_128x128.png 128
+icon_128x128@2x.png 256
+icon_256x256.png 256
+icon_256x256@2x.png 512
+icon_512x512.png 512
+icon_512x512@2x.png 1024
+ICON_SIZES
 iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
 test -s "$APP_DIR/Contents/Resources/AppIcon.icns"
 
@@ -66,11 +76,72 @@ codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ROOT_DIR/dist/MaosRec-macOS-10.15-Intel.zip"
 
 DMG_ROOT="$ROOT_DIR/.build/dmg-root"
-rm -rf "$DMG_ROOT"
-mkdir -p "$DMG_ROOT"
+DMG_MOUNT="$ROOT_DIR/.build/dmg-mount"
+DMG_RW="$ROOT_DIR/.build/MaosRec-rw.dmg"
+DMG_OUTPUT="$ROOT_DIR/dist/MaosRec-macOS-10.15-Intel.dmg"
+rm -rf "$DMG_ROOT" "$DMG_MOUNT" "$DMG_RW" "$DMG_OUTPUT"
+mkdir -p "$DMG_ROOT/.background" "$DMG_MOUNT"
 cp -R "$APP_DIR" "$DMG_ROOT/"
 ln -s /Applications "$DMG_ROOT/Applications"
-hdiutil create -volname "Maos Record" -srcfolder "$DMG_ROOT" -ov -format UDZO "$ROOT_DIR/dist/MaosRec-macOS-10.15-Intel.dmg"
+cp "$ROOT_DIR/Resources/DMGBackground.png" "$DMG_ROOT/.background/DMGBackground.png"
+
+hdiutil create \
+  -volname "Maos Record" \
+  -srcfolder "$DMG_ROOT" \
+  -fs HFS+ \
+  -format UDRW \
+  -ov \
+  "$DMG_RW"
+
+DMG_DEVICE="$(
+  hdiutil attach "$DMG_RW" \
+    -readwrite \
+    -noverify \
+    -noautoopen \
+    -mountpoint "$DMG_MOUNT" |
+    awk '/Apple_HFS/ { print $1; exit }'
+)"
+test -n "$DMG_DEVICE"
+
+cleanup_dmg() {
+  if [[ -n "${DMG_DEVICE:-}" ]]; then
+    hdiutil detach "$DMG_DEVICE" >/dev/null 2>&1 || hdiutil detach -force "$DMG_DEVICE" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_dmg EXIT
+
+osascript <<'APPLESCRIPT'
+tell application "Finder"
+  delay 1
+  tell disk "Maos Record"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set the bounds of container window to {120, 120, 780, 540}
+    set viewOptions to the icon view options of container window
+    set arrangement of viewOptions to not arranged
+    set icon size of viewOptions to 104
+    set text size of viewOptions to 14
+    set background picture of viewOptions to file ".background:DMGBackground.png"
+    set position of item "Maos Record.app" of container window to {165, 220}
+    set position of item "Applications" of container window to {495, 220}
+    update without registering applications
+    delay 2
+    close
+  end tell
+end tell
+APPLESCRIPT
+
+sync
+hdiutil detach "$DMG_DEVICE"
+DMG_DEVICE=""
+trap - EXIT
+rm -rf "$DMG_MOUNT"
+
+hdiutil convert "$DMG_RW" -format UDZO -imagekey zlib-level=9 -o "$DMG_OUTPUT"
+rm -f "$DMG_RW"
+test -s "$DMG_OUTPUT"
 
 cd "$ROOT_DIR/dist"
 shasum -a 256 MaosRec-macOS-10.15-Intel.zip MaosRec-macOS-10.15-Intel.dmg > SHA256SUMS.txt
