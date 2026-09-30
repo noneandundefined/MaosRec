@@ -1,30 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">Maos Record logo</title>
-  <rect x="28" y="28" width="456" height="456" rx="105" fill="#0e0f13"/>
-
-  <g fill="#f2f3f7">
-    <path d="M256 126
-             C300 126 337 146 359 177
-             C331 170 303 177 281 196
-             C258 216 248 244 252 274
-             C224 254 207 221 210 187
-             C213 159 231 137 256 126Z"/>
-    <path d="M256 126
-             C300 126 337 146 359 177
-             C331 170 303 177 281 196
-             C258 216 248 244 252 274
-             C224 254 207 221 210 187
-             C213 159 231 137 256 126Z"
-          transform="rotate(120 256 256)"/>
-    <path d="M256 126
-             C300 126 337 146 359 177
-             C331 170 303 177 281 196
-             C258 216 248 244 252 274
-             C224 254 207 221 210 187
-             C213 159 231 137 256 126Z"
-          transform="rotate(240 256 256)"/>
+  <defs>
+    <linearGradient id="blade" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#c5c8d0"/>
+      <stop offset="1" stop-color="#f7f8fa"/>
+    </linearGradient>
+    <radialGradient id="record" cx="50%" cy="38%" r="65%">
+      <stop offset="0" stop-color="#ff8c7a"/>
+      <stop offset="42%" stop-color="#ed1410"/>
+      <stop offset="100%" stop-color="#730808"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="238" fill="#34363b"/>
+  <circle cx="256" cy="256" r="214" fill="#121314"/>
+  <g fill="url(#blade)">
+    <path d="M 440.6 345.2 C 462.2 198.9 326.3 117.9 266.6 168.6 C 286.8 195.4 331.2 196.4 354.4 168.0 C 431.4 225.9 448.8 301.1 438.8 348.8 Z"/>
+    <path d="M 440.6 345.2 C 462.2 198.9 326.3 117.9 266.6 168.6 C 286.8 195.4 331.2 196.4 354.4 168.0 C 431.4 225.9 448.8 301.1 438.8 348.8 Z" transform="rotate(120 256 256)"/>
+    <path d="M 440.6 345.2 C 462.2 198.9 326.3 117.9 266.6 168.6 C 286.8 195.4 331.2 196.4 354.4 168.0 C 431.4 225.9 448.8 301.1 438.8 348.8 Z" transform="rotate(240 256 256)"/>
   </g>
-
-  <circle cx="256" cy="256" r="49" fill="#0e0f13"/>
-  <circle cx="256" cy="256" r="22" fill="#f22e33"/>
+  <circle cx="256" cy="256" r="60" fill="#0c0d10"/>
+  <circle cx="256" cy="256" r="42" fill="url(#record)"/>
+  <ellipse cx="249" cy="238" rx="11" ry="6" fill="#ffffff" opacity="0.55"/>
 </svg>
