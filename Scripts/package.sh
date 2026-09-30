@@ -41,7 +41,7 @@ done
 iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
 test -s "$APP_DIR/Contents/Resources/AppIcon.icns"
 
-lipo -verify_arch x86_64 "$APP_DIR/Contents/MacOS/MaosRec"
+lipo "$APP_DIR/Contents/MacOS/MaosRec" -verify_arch x86_64
 codesign --force --deep --sign - "$APP_DIR"
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 

@@ -61,11 +61,26 @@ final class ScreenRecorder: NSObject {
     var isBusy: Bool { writer != nil }
 
     static var videoDevices: [AVCaptureDevice] {
-        AVCaptureDevice.devices(for: .video).sorted { $0.localizedName < $1.localizedName }
+        var deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+        if #available(macOS 14.0, *) {
+            deviceTypes.append(.external)
+        } else {
+            deviceTypes.append(.externalUnknown)
+        }
+
+        return AVCaptureDevice.DiscoverySession(
+            deviceTypes: deviceTypes,
+            mediaType: .video,
+            position: .unspecified
+        ).devices.sorted { $0.localizedName < $1.localizedName }
     }
 
     static var audioDevices: [AVCaptureDevice] {
-        AVCaptureDevice.devices(for: .audio).sorted { $0.localizedName < $1.localizedName }
+        AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.microphone],
+            mediaType: .audio,
+            position: .unspecified
+        ).devices.sorted { $0.localizedName < $1.localizedName }
     }
 
     static func requestPermissions(camera: Bool, microphone: Bool, completion: @escaping (Bool) -> Void) {
