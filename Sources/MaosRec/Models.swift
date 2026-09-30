@@ -35,6 +35,8 @@ struct RecordingConfiguration {
     let cameraScale: CGFloat
     let quality: RecordingQuality
     let capturesCursor: Bool
+    /// Display points, origin at the top left. Nil records the whole display.
+    let cropRect: CGRect?
 }
 
 enum Preferences {
@@ -45,6 +47,8 @@ enum Preferences {
         static let quality = "quality"
         static let cameraPosition = "cameraPosition"
         static let cameraScale = "cameraScale"
+        static let recordCamera = "recordCamera"
+        static let recordMicrophone = "recordMicrophone"
         static let autoUpdates = "autoUpdates"
         static let minimizeOnRecord = "minimizeOnRecord"
     }
@@ -66,7 +70,7 @@ enum Preferences {
     }
 
     static var qualityIndex: Int {
-        get { defaults.object(forKey: Key.quality) == nil ? 1 : defaults.integer(forKey: Key.quality) }
+        get { defaults.object(forKey: Key.quality) == nil ? 0 : defaults.integer(forKey: Key.quality) }
         set { defaults.set(newValue, forKey: Key.quality) }
     }
 
@@ -78,6 +82,17 @@ enum Preferences {
     static var cameraScale: Double {
         get { defaults.object(forKey: Key.cameraScale) == nil ? 0.24 : defaults.double(forKey: Key.cameraScale) }
         set { defaults.set(newValue, forKey: Key.cameraScale) }
+    }
+
+    /// Off unless the user explicitly opts in. A missing key must stay screen-only.
+    static var recordCamera: Bool {
+        get { defaults.bool(forKey: Key.recordCamera) }
+        set { defaults.set(newValue, forKey: Key.recordCamera) }
+    }
+
+    static var recordMicrophone: Bool {
+        get { defaults.bool(forKey: Key.recordMicrophone) }
+        set { defaults.set(newValue, forKey: Key.recordMicrophone) }
     }
 
     static var autoUpdates: Bool {

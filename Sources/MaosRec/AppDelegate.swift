@@ -2,7 +2,6 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var mainWindowController: MainWindowController!
-    private var settingsWindowController: SettingsWindowController?
     private var updateController: UpdateController?
     private var updateTimer: Timer?
 
@@ -50,7 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func languageChanged() {
         buildMenu()
-        settingsWindowController?.reloadTexts()
     }
 
     private func buildMenu() {
@@ -76,11 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showSettings() {
-        if settingsWindowController == nil {
-            settingsWindowController = SettingsWindowController()
-        }
-        settingsWindowController?.showWindow(nil)
-        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        mainWindowController?.showSettingsPage()
         NSApp.activate(ignoringOtherApps: true)
     }
 

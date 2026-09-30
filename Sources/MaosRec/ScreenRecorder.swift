@@ -54,6 +54,8 @@ final class ScreenRecorder: NSObject {
     private var configuration: RecordingConfiguration?
     private var outputURL: URL?
     private var outputSize = CGSize(width: 1280, height: 720)
+    private var framesPerSecond = 15
+    private let timeline = RecordingTimeline()
     private var startedWriting = false
     private var isStopping = false
 
@@ -129,6 +131,8 @@ final class ScreenRecorder: NSObject {
 
         self.configuration = configuration
         self.outputURL = outputURL
+        framesPerSecond = configuration.quality.fps
+        timeline.reset()
         isStopping = false
         startedWriting = false
 
@@ -141,13 +145,23 @@ final class ScreenRecorder: NSObject {
             try FileManager.default.removeItem(at: outputURL)
         }
 
+        let displayBounds = CGDisplayBounds(configuration.displayID)
         let nativeWidth = CGFloat(CGDisplayPixelsWide(configuration.displayID))
         let nativeHeight = CGFloat(CGDisplayPixelsHigh(configuration.displayID))
-        guard nativeWidth > 0, nativeHeight > 0 else { throw RecorderError.displayUnavailable }
-        let scale = min(1, min(CGFloat(configuration.quality.width) / nativeWidth,
-                               CGFloat(configuration.quality.height) / nativeHeight))
-        let width = max(2, Int(nativeWidth * scale) / 2 * 2)
-        let height = max(2, Int(nativeHeight * scale) / 2 * 2)
+        guard nativeWidth > 0, nativeHeight > 0, displayBounds.width > 0, displayBounds.height > 0 else {
+            throw RecorderError.displayUnavailable
+        }
+        let backing = nativeWidth / displayBounds.width
+        let crop = configuration.cropRect.flatMap { rect -> CGRect? in
+            guard rect.width >= 2, rect.height >= 2 else { return nil }
+            return rect
+        }
+        let sourceWidth = (crop?.width ?? displayBounds.width) * backing
+        let sourceHeight = (crop?.height ?? displayBounds.height) * backing
+        let scale = min(1, min(CGFloat(configuration.quality.width) / sourceWidth,
+                               CGFloat(configuration.quality.height) / sourceHeight))
+        let width = max(2, Int(sourceWidth * scale) / 2 * 2)
+        let height = max(2, Int(sourceHeight * scale) / 2 * 2)
         outputSize = CGSize(width: width, height: height)
 
         let assetWriter: AVAssetWriter
@@ -263,6 +277,9 @@ final class ScreenRecorder: NSObject {
         }
         screenInput.minFrameDuration = CMTime(value: 1, timescale: CMTimeScale(configuration.quality.fps))
         screenInput.scaleFactor = scale
+        if let crop = configuration.cropRect, crop.width >= 2, crop.height >= 2 {
+            screenInput.cropRect = crop
+        }
         screenInput.capturesCursor = configuration.capturesCursor
         screenInput.capturesMouseClicks = false
         guard screenSession.canAddInput(screenInput) else { throw RecorderError.cannotAddScreenInput }
@@ -312,13 +329,13 @@ final class ScreenRecorder: NSObject {
               let videoInput = videoInput,
               let adaptor = pixelAdaptor else { return }
 
-        let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         if !startedWriting {
             guard writer.startWriting() else {
                 fail(writer.error ?? RecorderError.cannotCreateWriter("The writer did not start."))
                 return
             }
-            writer.startSession(atSourceTime: time)
+            // File time always starts at zero. Capture clocks are rebased in RecordingTimeline.
+            writer.startSession(atSourceTime: .zero)
             startedWriting = true
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
@@ -341,6 +358,12 @@ final class ScreenRecorder: NSObject {
         } else {
             return
         }
+
+        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(framesPerSecond, 1)))
+        let time = timeline.videoTime(
+            for: CMSampleBufferGetPresentationTimeStamp(sampleBuffer),
+            frameDuration: frameDuration
+        )
         adaptor.append(targetBuffer, withPresentationTime: time)
     }
 
@@ -403,7 +426,30 @@ final class ScreenRecorder: NSObject {
 
     private func appendAudio(_ sampleBuffer: CMSampleBuffer) {
         guard startedWriting, let input = audioInput, input.isReadyForMoreMediaData else { return }
-        input.append(sampleBuffer)
+        var duration = CMSampleBufferGetDuration(sampleBuffer)
+        if !duration.isNumeric || duration.seconds <= 0 || duration.seconds > 0.5 {
+            let samples = max(CMSampleBufferGetNumSamples(sampleBuffer), 1)
+            duration = CMTime(value: CMTimeValue(samples), timescale: 44_100)
+        }
+        let time = timeline.audioTime(
+            for: CMSampleBufferGetPresentationTimeStamp(sampleBuffer),
+            duration: duration
+        )
+        guard let retimed = retimedSampleBuffer(sampleBuffer, at: time, duration: duration) else { return }
+        input.append(retimed)
+    }
+
+    private func retimedSampleBuffer(_ sampleBuffer: CMSampleBuffer, at time: CMTime, duration: CMTime) -> CMSampleBuffer? {
+        var timing = CMSampleTimingInfo(duration: duration, presentationTimeStamp: time, decodeTimeStamp: .invalid)
+        var copy: CMSampleBuffer?
+        let status = CMSampleBufferCreateCopyWithNewTiming(
+            allocator: nil,
+            sampleBuffer: sampleBuffer,
+            sampleTimingEntryCount: 1,
+            sampleTimingArray: &timing,
+            sampleBufferOut: &copy
+        )
+        return status == noErr ? copy : nil
     }
 
     private func fail(_ error: Error) {
@@ -428,6 +474,91 @@ final class ScreenRecorder: NSObject {
         outputURL = nil
         startedWriting = false
         isStopping = false
+        framesPerSecond = 15
+        timeline.reset()
+    }
+}
+
+/// Maps capture timestamps onto a file timeline that starts at zero.
+///
+/// Screen-capture buffers sometimes begin at time zero and then jump to the
+/// host clock (hours since boot). Writing those values unchanged holds the
+/// first frame for hours. A forward jump larger than `maxGap` is treated as a
+/// broken clock and the file timeline stays continuous.
+private final class RecordingTimeline {
+    private var videoEpoch: CMTime?
+    private var audioEpoch: CMTime?
+    private var lastVideo = CMTime.invalid
+    private var lastAudio = CMTime.invalid
+    private let maxGap: Double = 30
+
+    func reset() {
+        videoEpoch = nil
+        audioEpoch = nil
+        lastVideo = .invalid
+        lastAudio = .invalid
+    }
+
+    func videoTime(for source: CMTime, frameDuration: CMTime) -> CMTime {
+        let result = map(source, step: frameDuration, epoch: videoEpoch, last: lastVideo)
+        videoEpoch = result.epoch
+        lastVideo = result.time
+        return result.time
+    }
+
+    func audioTime(for source: CMTime, duration: CMTime) -> CMTime {
+        let result = map(source, step: duration, epoch: audioEpoch, last: lastAudio)
+        audioEpoch = result.epoch
+        lastAudio = result.time
+        return result.time
+    }
+
+    private func map(_ source: CMTime, step: CMTime, epoch: CMTime?, last: CMTime) -> (time: CMTime, epoch: CMTime?) {
+        let advance = (step.isNumeric && step.seconds > 0) ? step : CMTime(value: 1, timescale: 600)
+        let sourceIsUsable = source.isNumeric && source.seconds.isFinite
+        var output: CMTime
+        var rebase = false
+        var nextEpoch = epoch
+
+        if !sourceIsUsable {
+            output = last.isNumeric ? CMTimeAdd(last, advance) : .zero
+        } else if let epoch = epoch {
+            output = CMTimeSubtract(source, epoch)
+            let end = timelineEnd()
+            if !output.isNumeric || output.seconds - end.seconds > maxGap {
+                output = CMTimeAdd(end, advance)
+                rebase = true
+            } else if output.seconds < 0 {
+                output = last.isNumeric ? CMTimeAdd(last, advance) : .zero
+            }
+        } else {
+            output = .zero
+            rebase = true
+        }
+
+        var scaled = CMTimeConvertScale(output, timescale: 600, method: .roundHalfAwayFromZero)
+        if last.isNumeric && CMTimeCompare(scaled, last) <= 0 {
+            let tick = CMTimeConvertScale(advance, timescale: 600, method: .roundHalfAwayFromZero)
+            let stepTick = tick.isNumeric && tick.value > 0 ? tick : CMTime(value: 1, timescale: 600)
+            scaled = CMTimeAdd(last, stepTick)
+        }
+        if rebase, sourceIsUsable {
+            nextEpoch = CMTimeSubtract(source, scaled)
+        }
+        return (scaled, nextEpoch)
+    }
+
+    private func timelineEnd() -> CMTime {
+        switch (lastVideo.isNumeric, lastAudio.isNumeric) {
+        case (true, true):
+            return CMTimeMaximum(lastVideo, lastAudio)
+        case (true, false):
+            return lastVideo
+        case (false, true):
+            return lastAudio
+        default:
+            return .zero
+        }
     }
 }
 

@@ -7,3 +7,4 @@ DerivedData/
 *.dSYM/
 *.zip
 *.dmg
+.cursor/
