@@ -1,0 +1,152 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and package Catalina app
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            app_version="${GITHUB_REF_NAME#v}"
+          else
+            app_version="0.1.${GITHUB_RUN_NUMBER}"
+          fi
+
+          build_log="$RUNNER_TEMP/maosrec-package.log"
+          set +e
+          APP_VERSION="$app_version" \
+            BUILD_NUMBER="$GITHUB_RUN_NUMBER" \
+            bash Scripts/package.sh 2>&1 | tee "$build_log"
+          build_status=${PIPESTATUS[0]}
+          set -e
+
+          if [[ $build_status -ne 0 ]]; then
+            while IFS= read -r line; do
+              escaped="${line//'%'/'%25'}"
+              escaped="${escaped//$'\r'/'%0D'}"
+              escaped="${escaped//$'\n'/'%0A'}"
+              echo "::error title=macOS build failed::$escaped"
+            done < <(grep -E '(^|:)[0-9]+:[0-9]+: error:|(^| )error:' "$build_log" | tail -n 20 || true)
+            exit "$build_status"
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaosRec-macOS-10.15-Intel
+          path: |
+            dist/MaosRec-macOS-10.15-Intel.zip
+            dist/MaosRec-macOS-10.15-Intel.dmg
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Generate release description
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes_file="$RUNNER_TEMP/release-notes.md"
+          cat > "$notes_file" <<'RELEASE_NOTES'
+          MaosRec is a lightweight native screen recorder for older Intel Macs running macOS Catalina 10.15 or newer.
+
+          ## 🇬🇧 English
+
+          ### Highlights
+
+          - Record a selected display to H.264 MP4
+          - Optional microphone or virtual audio-device recording
+          - Camera overlay with adjustable size and four corner positions
+          - Economy 540p/12 fps mode for low-memory Macs
+          - Native AppKit interface following the system light or dark appearance
+          - English and Russian languages
+          - Automatic update checks with SHA-256 verified installation
+
+          ### Installation
+
+          1. Download **`MaosRec-macOS-10.15-Intel.dmg`** below.
+          2. Open the DMG.
+          3. Drag **MaosRec.app** onto the **Applications** shortcut.
+          4. Right-click MaosRec in Applications and choose **Open** on first launch.
+          5. Allow Screen Recording, Camera, and Microphone when macOS asks.
+
+          Requirements: **macOS 10.15+** and an **Intel (`x86_64`) Mac**.
+
+          ---
+
+          ## 🇷🇺 Русский
+
+          MaosRec — лёгкая нативная программа записи экрана для старых Intel Mac с macOS Catalina 10.15 и новее.
+
+          ### Возможности
+
+          - Запись выбранного монитора в H.264 MP4
+          - Запись с микрофона или виртуального аудиоустройства
+          - Камера поверх экрана с выбором размера и положения
+          - Экономный режим 540p/12 кадров для слабых Mac
+          - Нативный интерфейс с системной светлой или тёмной темой
+          - Русский и английский языки
+          - Автообновление с проверкой SHA-256
+
+          ### Установка
+
+          1. Скачайте **`MaosRec-macOS-10.15-Intel.dmg`** ниже.
+          2. Откройте DMG.
+          3. Перетащите **MaosRec.app** на ярлык **Applications**.
+          4. При первом запуске нажмите приложение правой кнопкой и выберите **Открыть**.
+          5. Разрешите запись экрана, камеру и микрофон по запросу macOS.
+
+          Требования: **macOS 10.15+** и **Mac с Intel (`x86_64`)**.
+
+          ---
+
+          ## Downloads / Загрузки
+
+          - **DMG** — recommended installer / рекомендуемый установщик
+          - **ZIP** — portable app archive / архив приложения
+          - **SHA256SUMS.txt** — checksums / контрольные суммы
+
+          Public packages are ad-hoc signed, so macOS may require right-click → Open on first launch.
+          RELEASE_NOTES
+
+          generated_notes="$(gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$GITHUB_REF_NAME" --jq '.body')"
+          if [[ -n "$generated_notes" ]]; then
+            printf '\n\n---\n\n## Changes in %s\n\n%s\n' "$GITHUB_REF_NAME" "$generated_notes" >> "$notes_file"
+          fi
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets=(
+            dist/MaosRec-macOS-10.15-Intel.zip
+            dist/MaosRec-macOS-10.15-Intel.dmg
+            dist/SHA256SUMS.txt
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+            gh release edit "$GITHUB_REF_NAME" --title "MaosRec $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --notes-file "$RUNNER_TEMP/release-notes.md" --latest --title "MaosRec $GITHUB_REF_NAME"
+          fi

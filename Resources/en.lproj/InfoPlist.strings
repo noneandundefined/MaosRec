@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "MaosRec uses the camera when you enable a camera overlay.";
+"NSMicrophoneUsageDescription" = "MaosRec uses the selected microphone when audio recording is enabled.";
