@@ -23,35 +23,106 @@ func color(_ red: CGFloat, _ green: CGFloat, _ blue: CGFloat, _ alpha: CGFloat =
     CGColor(colorSpace: space, components: [red, green, blue, alpha])!
 }
 
+func petalPath(center: CGPoint, radius: CGFloat, angle: CGFloat) -> CGPath {
+    let path = CGMutablePath()
+    let c1 = CGPoint(
+        x: center.x + cos(angle - .pi / 3) * radius * 0.92,
+        y: center.y + sin(angle - .pi / 3) * radius * 0.92
+    )
+    let c2 = CGPoint(
+        x: center.x + cos(angle + .pi / 3) * radius * 0.92,
+        y: center.y + sin(angle + .pi / 3) * radius * 0.92
+    )
+    let tip = CGPoint(
+        x: center.x + cos(angle) * radius,
+        y: center.y + sin(angle) * radius
+    )
+    let inner = CGPoint(
+        x: center.x + cos(angle + .pi) * radius * 0.24,
+        y: center.y + sin(angle + .pi) * radius * 0.24
+    )
+
+    path.move(to: inner)
+    path.addCurve(
+        to: tip,
+        control1: CGPoint(
+            x: center.x + cos(angle - .pi / 2.5) * radius * 0.48,
+            y: center.y + sin(angle - .pi / 2.5) * radius * 0.48
+        ),
+        control2: c1
+    )
+    path.addCurve(
+        to: inner,
+        control1: c2,
+        control2: CGPoint(
+            x: center.x + cos(angle + .pi / 2.5) * radius * 0.48,
+            y: center.y + sin(angle + .pi / 2.5) * radius * 0.48
+        )
+    )
+    path.closeSubpath()
+    return path
+}
+
 func writeIcon(size: Int, to url: URL) throws {
     let space = CGColorSpaceCreateDeviceRGB()
     let info = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
-    guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4, space: space, bitmapInfo: info) else { throw IconError.context }
+    guard let context = CGContext(
+        data: nil,
+        width: size,
+        height: size,
+        bitsPerComponent: 8,
+        bytesPerRow: size * 4,
+        space: space,
+        bitmapInfo: info
+    ) else { throw IconError.context }
+
     context.setAllowsAntialiasing(true)
     context.setShouldAntialias(true)
+
     let d = CGFloat(size)
-    let background = CGPath(roundedRect: CGRect(x: d * 0.045, y: d * 0.045, width: d * 0.91, height: d * 0.91), cornerWidth: d * 0.22, cornerHeight: d * 0.22, transform: nil)
+    let background = CGPath(
+        roundedRect: CGRect(x: d * 0.055, y: d * 0.055, width: d * 0.89, height: d * 0.89),
+        cornerWidth: d * 0.205,
+        cornerHeight: d * 0.205,
+        transform: nil
+    )
     context.addPath(background)
-    context.setFillColor(color(0.06, 0.08, 0.12, space: space))
+    context.setFillColor(color(0.055, 0.06, 0.075, space: space))
     context.fillPath()
 
-    context.setStrokeColor(color(0.20, 0.55, 0.98, space: space))
-    context.setLineWidth(d * 0.085)
-    context.strokeEllipse(in: CGRect(x: d * 0.22, y: d * 0.22, width: d * 0.56, height: d * 0.56))
-    context.setFillColor(color(0.96, 0.97, 1.0, space: space))
-    context.fillEllipse(in: CGRect(x: d * 0.39, y: d * 0.39, width: d * 0.22, height: d * 0.22))
-    context.setFillColor(color(0.96, 0.24, 0.28, space: space))
-    context.fillEllipse(in: CGRect(x: d * 0.69, y: d * 0.69, width: d * 0.11, height: d * 0.11))
+    let center = CGPoint(x: d * 0.5, y: d * 0.5)
+    let radius = d * 0.255
+
+    for index in 0..<3 {
+        let angle = CGFloat(index) * (2 * .pi / 3) - .pi / 2
+        context.addPath(petalPath(center: center, radius: radius, angle: angle))
+        context.setFillColor(color(0.94, 0.95, 0.97, space: space))
+        context.fillPath()
+    }
+
+    context.setFillColor(color(0.055, 0.06, 0.075, space: space))
+    context.fillEllipse(in: CGRect(x: d * 0.405, y: d * 0.405, width: d * 0.19, height: d * 0.19))
+
+    context.setFillColor(color(0.95, 0.18, 0.20, space: space))
+    context.fillEllipse(in: CGRect(x: d * 0.4575, y: d * 0.4575, width: d * 0.085, height: d * 0.085))
 
     guard let image = context.makeImage() else { throw IconError.image }
-    guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else { throw IconError.destination }
+    guard let destination = CGImageDestinationCreateWithURL(
+        url as CFURL,
+        UTType.png.identifier as CFString,
+        1,
+        nil
+    ) else { throw IconError.destination }
+
     CGImageDestinationAddImage(destination, image, nil)
     guard CGImageDestinationFinalize(destination) else { throw IconError.write }
 }
 
 do {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-    for (name, size) in variants { try writeIcon(size: size, to: output.appendingPathComponent(name)) }
+    for (name, size) in variants {
+        try writeIcon(size: size, to: output.appendingPathComponent(name))
+    }
 } catch {
     fputs("Icon generation failed: \(error.localizedDescription)\n", stderr)
     exit(1)

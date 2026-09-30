@@ -25,6 +25,7 @@ chmod 755 "$APP_DIR/Contents/MacOS/MaosRec"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :MaosRecGitHubRepository $GITHUB_REPOSITORY_SLUG" "$APP_DIR/Contents/Info.plist"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Contents/Info.plist")" = "$APP_VERSION"
+test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP_DIR/Contents/Info.plist")" = "10.15"
 plutil -lint "$APP_DIR/Contents/Info.plist"
 
 ICONSET="$ROOT_DIR/.build/MaosRec.iconset"
@@ -41,7 +42,24 @@ done
 iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
 test -s "$APP_DIR/Contents/Resources/AppIcon.icns"
 
-lipo "$APP_DIR/Contents/MacOS/MaosRec" -verify_arch x86_64
+BINARY="$APP_DIR/Contents/MacOS/MaosRec"
+lipo "$BINARY" -verify_arch x86_64
+
+binary_archs="$(lipo -archs "$BINARY")"
+if [[ "$binary_archs" != "x86_64" ]]; then
+  echo "Expected an Intel-only x86_64 binary, got: $binary_archs" >&2
+  exit 1
+fi
+
+binary_min_os="$(otool -l "$BINARY" | awk '$1 == "minos" { print $2; exit }')"
+case "$binary_min_os" in
+  10.15|10.15.*) ;;
+  *)
+    echo "Expected macOS deployment target 10.15, got: ${binary_min_os:-unknown}" >&2
+    exit 1
+    ;;
+esac
+
 codesign --force --deep --sign - "$APP_DIR"
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 
