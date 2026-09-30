@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" width="128" height="128" alt="MaosRec logo">
+  <img src="docs/assets/logo.svg" width="128" height="128" alt="Maos Record logo">
 </p>
 
-<h1 align="center">MaosRec</h1>
+<h1 align="center">Maos Record</h1>
 
 <p align="center">A lightweight, open-source screen recorder for older Intel Macs.</p>
 
@@ -18,7 +18,7 @@
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-22C55E">
 </p>
 
-MaosRec records a selected display to an H.264 MP4 file, optionally adding microphone audio and a camera overlay. It uses native AppKit and AVFoundation instead of a browser engine, and includes low-load settings for Intel Macs that cannot run modern recording applications.
+Maos Record records a selected display to an H.264 MP4 file, optionally adding microphone audio and a camera overlay. It uses native AppKit and AVFoundation instead of a browser engine, and includes low-load settings for Intel Macs that cannot run modern recording applications.
 
 ## Download
 
@@ -26,8 +26,8 @@ Download the latest installer from **[GitHub Releases](../../releases/latest)**:
 
 1. Download `MaosRec-macOS-10.15-Intel.dmg`.
 2. Open the DMG.
-3. Drag **MaosRec.app** onto the **Applications** shortcut.
-4. Open Applications, right-click MaosRec, and choose **Open** on first launch.
+3. Drag **Maos Record.app** onto the **Applications** shortcut.
+4. Open Applications, right-click Maos Record, and choose **Open** on first launch.
 5. Allow Screen Recording and, when used, Camera and Microphone access.
 
 Requirements:
@@ -49,7 +49,7 @@ Requirements:
 - update notification, download, SHA-256 verification, installation, and relaunch;
 - automated Intel DMG and ZIP releases through GitHub Actions.
 
-macOS 10.15 does not provide ordinary applications with direct system-audio capture. MaosRec records the selected audio input. A virtual audio device can be selected when application audio is required.
+macOS 10.15 does not provide ordinary applications with direct system-audio capture. Maos Record records the selected audio input. A virtual audio device can be selected when application audio is required.
 
 ## Documentation
 
@@ -81,4 +81,4 @@ The workflow builds the app and adds all three files to GitHub Releases. No upda
 
 ## License
 
-MaosRec is available under the [MIT License](LICENSE).
+Maos Record is available under the [MIT License](LICENSE).

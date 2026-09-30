@@ -60,7 +60,7 @@ enum Preferences {
                 return URL(fileURLWithPath: path, isDirectory: true)
             }
             return FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first!
-                .appendingPathComponent("MaosRec", isDirectory: true)
+                .appendingPathComponent("Maos Record", isDirectory: true)
         }
         set { defaults.set(newValue.path, forKey: Key.outputDirectory) }
     }

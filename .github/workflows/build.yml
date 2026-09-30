@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build and package Catalina app
         shell: bash
@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           notes_file="$RUNNER_TEMP/release-notes.md"
           cat > "$notes_file" <<'RELEASE_NOTES'
-          MaosRec is a lightweight native screen recorder for older Intel Macs running macOS Catalina 10.15 or newer.
+          Maos Record is a lightweight native screen recorder for older Intel Macs running macOS Catalina 10.15 or newer.
 
           ## 🇬🇧 English
 
@@ -84,8 +84,8 @@ jobs:
 
           1. Download **`MaosRec-macOS-10.15-Intel.dmg`** below.
           2. Open the DMG.
-          3. Drag **MaosRec.app** onto the **Applications** shortcut.
-          4. Right-click MaosRec in Applications and choose **Open** on first launch.
+          3. Drag **Maos Record.app** onto the **Applications** shortcut.
+          4. Right-click Maos Record in Applications and choose **Open** on first launch.
           5. Allow Screen Recording, Camera, and Microphone when macOS asks.
 
           Requirements: **macOS 10.15+** and an **Intel (`x86_64`) Mac**.
@@ -94,7 +94,7 @@ jobs:
 
           ## 🇷🇺 Русский
 
-          MaosRec — лёгкая нативная программа записи экрана для старых Intel Mac с macOS Catalina 10.15 и новее.
+          Maos Record — лёгкая нативная программа записи экрана для старых Intel Mac с macOS Catalina 10.15 и новее.
 
           ### Возможности
 
@@ -110,7 +110,7 @@ jobs:
 
           1. Скачайте **`MaosRec-macOS-10.15-Intel.dmg`** ниже.
           2. Откройте DMG.
-          3. Перетащите **MaosRec.app** на ярлык **Applications**.
+          3. Перетащите **Maos Record.app** на ярлык **Applications**.
           4. При первом запуске нажмите приложение правой кнопкой и выберите **Открыть**.
           5. Разрешите запись экрана, камеру и микрофон по запросу macOS.
 
@@ -146,7 +146,7 @@ jobs:
           )
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
-            gh release edit "$GITHUB_REF_NAME" --title "MaosRec $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            gh release edit "$GITHUB_REF_NAME" --title "Maos Record $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           else
-            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --notes-file "$RUNNER_TEMP/release-notes.md" --latest --title "MaosRec $GITHUB_REF_NAME"
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --notes-file "$RUNNER_TEMP/release-notes.md" --latest --title "Maos Record $GITHUB_REF_NAME"
           fi

@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>MaosRec</string>
+    <string>Maos Record</string>
     <key>CFBundleExecutable</key>
     <string>MaosRec</string>
     <key>CFBundleIconFile</key>
@@ -15,7 +15,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>MaosRec</string>
+    <string>Maos Record</string>
     <key>CFBundleLocalizations</key>
     <array>
         <string>en</string>
@@ -36,9 +36,9 @@
     <key>MaosRecGitHubRepository</key>
     <string>noneandundefined/MaosRec</string>
     <key>NSCameraUsageDescription</key>
-    <string>MaosRec uses the camera when you enable a camera overlay.</string>
+    <string>Maos Record uses the camera when you enable a camera overlay.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>MaosRec uses the selected microphone when audio recording is enabled.</string>
+    <string>Maos Record uses the selected microphone when audio recording is enabled.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>

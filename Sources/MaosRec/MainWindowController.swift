@@ -12,7 +12,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
     private var lastSavedURL: URL?
     private var terminatingAfterSave = false
 
-    private let titleLabel = NSTextField(labelWithString: "MaosRec")
+    private let titleLabel = NSTextField(labelWithString: "Maos Record")
     private let subtitleLabel = NSTextField(labelWithString: "")
     private let screenTitle = NSTextField(labelWithString: "")
     private let cameraTitle = NSTextField(labelWithString: "")
@@ -46,7 +46,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "MaosRec"
+        window.title = "Maos Record"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
@@ -168,7 +168,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         showFileButton.isHidden = true
         bottom.addArrangedSubview(showFileButton)
         recordButton.bezelStyle = .rounded
-        recordButton.controlSize = .large
+        recordButton.controlSize = .regular
         recordButton.font = .systemFont(ofSize: 14, weight: .semibold)
         recordButton.target = self
         recordButton.action = #selector(recordPressed)
@@ -299,7 +299,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
             guard let self = self else { return }
             guard granted else {
                 self.setControls(enabled: true)
-                self.presentError(RecorderError.cannotCreateWriter(tr("record.devicePermission")))
+                self.showRecordingError(RecorderError.cannotCreateWriter(tr("record.devicePermission")))
                 return
             }
             let qualityIndex = min(max(Preferences.qualityIndex, 0), RecordingQuality.values.count - 1)
@@ -317,7 +317,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
                 try self.recorder.start(configuration: configuration, outputURL: self.makeOutputURL())
             } catch {
                 self.setControls(enabled: true)
-                self.presentError(error)
+                self.showRecordingError(error)
             }
         }
     }
@@ -326,7 +326,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        return Preferences.outputDirectory.appendingPathComponent("MaosRec_\(formatter.string(from: Date())).mp4")
+        return Preferences.outputDirectory.appendingPathComponent("MaosRecord_\(formatter.string(from: Date())).mp4")
     }
 
     private func setControls(enabled: Bool) {
@@ -378,7 +378,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         if terminatingAfterSave {
             NSApp.reply(toApplicationShouldTerminate: true)
         } else {
-            presentError(error)
+            showRecordingError(error)
         }
     }
 
@@ -396,7 +396,7 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         }
     }
 
-    private func presentError(_ error: Error) {
+    private func showRecordingError(_ error: Error) {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = tr("record.error")

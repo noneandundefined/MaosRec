@@ -27,7 +27,7 @@ final class L10n {
             "record.elapsed": "Recording  %@",
             "record.saved": "Recording saved",
             "record.error": "Could not record",
-            "record.permission": "Allow Screen Recording in System Preferences → Security & Privacy, then restart MaosRec.",
+            "record.permission": "Allow Screen Recording in System Preferences → Security & Privacy, then restart Maos Record.",
             "record.devicePermission": "Camera or microphone access was denied. Allow access in System Preferences → Security & Privacy.",
             "error.display": "The selected display is no longer available.",
             "error.screenInput": "The screen capture input could not be created.",
@@ -61,7 +61,7 @@ final class L10n {
             "menu.file": "File",
             "menu.settings": "Settings…",
             "menu.updates": "Check for Updates…",
-            "menu.quit": "Quit MaosRec",
+            "menu.quit": "Quit Maos Record",
             "menu.showFile": "Show in Finder",
             "alert.ok": "OK"
         ],
@@ -84,7 +84,7 @@ final class L10n {
             "record.elapsed": "Идёт запись  %@",
             "record.saved": "Запись сохранена",
             "record.error": "Не удалось записать",
-            "record.permission": "Разрешите «Запись экрана» в Системных настройках → Защита и безопасность, затем перезапустите MaosRec.",
+            "record.permission": "Разрешите «Запись экрана» в Системных настройках → Защита и безопасность, затем перезапустите Maos Record.",
             "record.devicePermission": "Нет доступа к камере или микрофону. Разрешите доступ в Системных настройках → Защита и безопасность.",
             "error.display": "Выбранный монитор больше недоступен.",
             "error.screenInput": "Не удалось создать источник записи экрана.",
@@ -118,7 +118,7 @@ final class L10n {
             "menu.file": "Файл",
             "menu.settings": "Настройки…",
             "menu.updates": "Проверить обновления…",
-            "menu.quit": "Завершить MaosRec",
+            "menu.quit": "Завершить Maos Record",
             "menu.showFile": "Показать в Finder",
             "alert.ok": "ОК"
         ]

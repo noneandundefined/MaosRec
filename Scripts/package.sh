@@ -10,7 +10,7 @@ cd "$ROOT_DIR"
 MACOSX_DEPLOYMENT_TARGET=10.15 swift build -c release --arch x86_64
 BIN_DIR="$(swift build -c release --arch x86_64 --show-bin-path)"
 
-APP_DIR="$ROOT_DIR/dist/MaosRec.app"
+APP_DIR="$ROOT_DIR/dist/Maos Record.app"
 rm -rf "$ROOT_DIR/dist"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
@@ -52,7 +52,7 @@ rm -rf "$DMG_ROOT"
 mkdir -p "$DMG_ROOT"
 cp -R "$APP_DIR" "$DMG_ROOT/"
 ln -s /Applications "$DMG_ROOT/Applications"
-hdiutil create -volname "MaosRec" -srcfolder "$DMG_ROOT" -ov -format UDZO "$ROOT_DIR/dist/MaosRec-macOS-10.15-Intel.dmg"
+hdiutil create -volname "Maos Record" -srcfolder "$DMG_ROOT" -ov -format UDZO "$ROOT_DIR/dist/MaosRec-macOS-10.15-Intel.dmg"
 
 cd "$ROOT_DIR/dist"
 shasum -a 256 MaosRec-macOS-10.15-Intel.zip MaosRec-macOS-10.15-Intel.dmg > SHA256SUMS.txt

@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildMenu() {
         let root = NSMenu()
         let appItem = NSMenuItem()
-        appItem.title = "MaosRec"
+        appItem.title = "Maos Record"
         root.addItem(appItem)
         let appMenu = NSMenu()
         appItem.submenu = appMenu

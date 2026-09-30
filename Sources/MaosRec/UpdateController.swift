@@ -138,8 +138,8 @@ final class UpdateController {
         alert.alertStyle = .informational
         alert.messageText = local("Version \(version) is available", "Доступна версия \(version)")
         alert.informativeText = local(
-            "MaosRec will download and verify the update, install it, and restart. Current version: \(currentVersionString).",
-            "MaosRec скачает и проверит обновление, установит его и перезапустится. Текущая версия: \(currentVersionString)."
+            "Maos Record will download and verify the update, install it, and restart. Current version: \(currentVersionString).",
+            "Maos Record скачает и проверит обновление, установит его и перезапустится. Текущая версия: \(currentVersionString)."
         )
         alert.addButton(withTitle: local("Update", "Обновить"))
         alert.addButton(withTitle: local("Later", "Позже"))
@@ -153,7 +153,7 @@ final class UpdateController {
         NSApp.dockTile.badgeLabel = nil
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = local("MaosRec is up to date", "Установлена последняя версия MaosRec")
+        alert.messageText = local("Maos Record is up to date", "Установлена последняя версия Maos Record")
         alert.informativeText = local("Current version: \(currentVersionString).", "Текущая версия: \(currentVersionString).")
         alert.addButton(withTitle: local("OK", "Хорошо"))
         present(alert, completion: nil)
@@ -250,7 +250,7 @@ final class UpdateController {
         let extracted = temporaryDirectory.appendingPathComponent("extracted", isDirectory: true)
         try FileManager.default.createDirectory(at: extracted, withIntermediateDirectories: true)
         try runProcess("/usr/bin/ditto", arguments: ["-x", "-k", archiveURL.path, extracted.path])
-        let candidate = extracted.appendingPathComponent("MaosRec.app", isDirectory: true)
+        let candidate = extracted.appendingPathComponent("Maos Record.app", isDirectory: true)
         guard let bundle = Bundle(url: candidate),
               bundle.bundleIdentifier == "com.maosrec.app",
               bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == expectedVersion,
@@ -361,7 +361,7 @@ final class UpdateController {
         DispatchQueue.main.async {
             let alert = NSAlert()
             alert.alertStyle = .informational
-            alert.messageText = local("Updating MaosRec", "Обновление MaosRec")
+            alert.messageText = local("Updating Maos Record", "Обновление Maos Record")
             alert.informativeText = local("Downloading and verifying the update…", "Загрузка и проверка обновления…")
             let progress = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 240, height: 20))
             progress.style = .spinning
