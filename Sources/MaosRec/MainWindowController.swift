@@ -585,7 +585,6 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         screenModeButton.isEnabled = enabled
         windowModeButton.isEnabled = enabled
         areaModeButton.isEnabled = enabled
-        tabs.isEnabled = true
         recordButton.isEnabled = enabled
     }
 
