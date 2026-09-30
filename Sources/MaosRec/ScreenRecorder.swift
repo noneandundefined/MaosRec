@@ -76,11 +76,16 @@ final class ScreenRecorder: NSObject {
     }
 
     static var audioDevices: [AVCaptureDevice] {
-        AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.microphone],
-            mediaType: .audio,
-            position: .unspecified
-        ).devices.sorted { $0.localizedName < $1.localizedName }
+        if #available(macOS 14.0, *) {
+            return AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.microphone],
+                mediaType: .audio,
+                position: .unspecified
+            ).devices.sorted { $0.localizedName < $1.localizedName }
+        }
+
+        return AVCaptureDevice.devices(for: .audio)
+            .sorted { $0.localizedName < $1.localizedName }
     }
 
     static func requestPermissions(camera: Bool, microphone: Bool, completion: @escaping (Bool) -> Void) {
