@@ -109,15 +109,25 @@ cleanup_dmg() {
   fi
 }
 
+dmg_is_attached() {
+  hdiutil info | grep -Fq "$DMG_DEVICE"
+}
+
 detach_dmg() {
   local attempt
+  if ! dmg_is_attached; then
+    return 0
+  fi
   for attempt in 1 2 3; do
     if hdiutil detach "$DMG_DEVICE"; then
       return 0
     fi
     sleep 2
   done
-  hdiutil detach -force "$DMG_DEVICE"
+  diskutil unmountDisk force "$DMG_DEVICE" >/dev/null 2>&1 || true
+  if dmg_is_attached; then
+    hdiutil detach -force "$DMG_DEVICE"
+  fi
 }
 
 trap cleanup_dmg EXIT
@@ -141,6 +151,9 @@ tell application "Finder"
     update without registering applications
     delay 2
     close
+    try
+      eject
+    end try
   end tell
 end tell
 APPLESCRIPT
