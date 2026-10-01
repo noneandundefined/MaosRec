@@ -88,6 +88,14 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         reloadDevices()
         reloadTexts()
         NotificationCenter.default.addObserver(self, selector: #selector(reloadTexts), name: .languageDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(captureDevicesChanged), name: NSNotification.Name("AVCaptureDeviceWasConnectedNotification"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(captureDevicesChanged), name: NSNotification.Name("AVCaptureDeviceWasDisconnectedNotification"), object: nil)
+    }
+
+    @objc private func captureDevicesChanged() {
+        DispatchQueue.main.async { [weak self] in
+            self?.reloadDevices()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -334,8 +342,13 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         outputPath.stringValue = Preferences.outputDirectory.path
         minimizeCheckbox.state = Preferences.minimizeOnRecord ? .on : .off
         autoUpdateCheckbox.state = Preferences.autoUpdates ? .on : .off
-        positionPopup.isEnabled = cameraPopup.indexOfSelectedItem > 0
-        cameraSizeSlider.isEnabled = cameraPopup.indexOfSelectedItem > 0
+        let busy = recorder.isBusy
+        positionPopup.isEnabled = !busy && cameraPopup.indexOfSelectedItem > 0
+        cameraSizeSlider.isEnabled = !busy && cameraPopup.indexOfSelectedItem > 0
+        if busy {
+            setControls(enabled: false)
+            recordButton.isEnabled = recorder.isRecording
+        }
     }
 
     private func refill(_ popup: NSPopUpButton, none: String, names: [String], previous: String?, preferOn: Bool) {
@@ -489,7 +502,10 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
     }
 
     private func startRecording() {
-        guard !displays.isEmpty else { return }
+        guard !displays.isEmpty else {
+            showRecordingError(RecorderError.displayUnavailable)
+            return
+        }
         let cameraIndex = cameraPopup.indexOfSelectedItem
         let audioIndex = audioPopup.indexOfSelectedItem
         let wantsCamera = cameraIndex > 0 && cameraIndex - 1 < videoDevices.count
@@ -504,7 +520,12 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
                 return
             }
             let qualityIndex = min(max(Preferences.qualityIndex, 0), RecordingQuality.values.count - 1)
-            let target = self.captureTarget()
+            guard let target = self.captureTarget() else {
+                self.setControls(enabled: true)
+                let message = self.mode == .window ? tr("source.noWindow") : tr("error.display")
+                self.showRecordingError(RecorderError.cannotCreateWriter(message))
+                return
+            }
             let configuration = RecordingConfiguration(
                 displayID: target.displayID,
                 audioDevice: wantsAudio ? self.audioDevices[safe: audioIndex - 1] : nil,
@@ -517,6 +538,9 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
             )
             do {
                 try self.recorder.start(configuration: configuration, outputURL: self.makeOutputURL())
+                self.recordButton.isEnabled = true
+                self.recordButton.image = RecordArt.stop
+                self.recordCaption.stringValue = tr("record.stop")
             } catch {
                 self.setControls(enabled: true)
                 self.showRecordingError(error)
@@ -524,21 +548,29 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         }
     }
 
-    private func captureTarget() -> (displayID: CGDirectDisplayID, crop: CGRect?) {
-        let fallback = displays[min(max(displayPopup.indexOfSelectedItem, 0), max(displays.count - 1, 0))].id
+    private func captureTarget() -> (displayID: CGDirectDisplayID, crop: CGRect?)? {
         switch mode {
-        case .screen:
-            return (fallback, nil)
-        case .area:
-            return (fallback, areaCrop(displayID: fallback))
+        case .screen, .area:
+            guard !displays.isEmpty else { return nil }
+            let index = min(max(displayPopup.indexOfSelectedItem, 0), displays.count - 1)
+            let displayID = displays[index].id
+            if mode == .screen { return (displayID, nil) }
+            return (displayID, areaCrop(displayID: displayID))
         case .window:
-            windows = loadWindows()
-            let title = displayPopup.titleOfSelectedItem
-            let choice = windows.first { $0.title == title } ?? windows.first
-            if let choice = choice, let crop = windowCrop(choice) {
-                return crop
+            let selectedIndex = displayPopup.indexOfSelectedItem
+            let selectedTitle = displayPopup.titleOfSelectedItem
+            let refreshed = loadWindows()
+            windows = refreshed
+            let choice: WindowChoice?
+            if refreshed.indices.contains(selectedIndex), refreshed[selectedIndex].title == selectedTitle {
+                choice = refreshed[selectedIndex]
+            } else if let selectedTitle = selectedTitle {
+                choice = refreshed.first { $0.title == selectedTitle }
+            } else {
+                choice = nil
             }
-            return (fallback, nil)
+            guard let choice = choice else { return nil }
+            return windowCrop(choice)
         }
     }
 
@@ -546,23 +578,38 @@ final class MainWindowController: NSWindowController, ScreenRecorderDelegate {
         let bounds = CGDisplayBounds(displayID)
         let selection = areaPicker.selection
         guard selection.width < 0.98 || selection.height < 0.98 else { return nil }
-        return CGRect(
+        var rect = CGRect(
             x: (selection.origin.x * bounds.width).rounded(.down),
             y: (selection.origin.y * bounds.height).rounded(.down),
             width: max(2, (selection.width * bounds.width).rounded(.down)),
             height: max(2, (selection.height * bounds.height).rounded(.down))
         )
+        if rect.origin.x < 0 { rect.origin.x = 0 }
+        if rect.origin.y < 0 { rect.origin.y = 0 }
+        if rect.maxX > bounds.width { rect.size.width = max(0, bounds.width - rect.origin.x) }
+        if rect.maxY > bounds.height { rect.size.height = max(0, bounds.height - rect.origin.y) }
+        guard rect.width >= 2, rect.height >= 2 else { return nil }
+        return rect
     }
 
     private func windowCrop(_ window: WindowChoice) -> (displayID: CGDirectDisplayID, crop: CGRect?)? {
         let center = CGPoint(x: window.bounds.midX, y: window.bounds.midY)
+        var fallback: (CGDirectDisplayID, CGRect)?
         for display in displays {
             let bounds = CGDisplayBounds(display.id)
-            guard bounds.contains(center) else { continue }
             let local = window.bounds.offsetBy(dx: -bounds.origin.x, dy: -bounds.origin.y)
-            let hit = local.intersection(CGRect(origin: .zero, size: bounds.size))
-            guard hit.width >= 80, hit.height >= 80 else { return (display.id, nil) }
-            return (display.id, hit.integral)
+            let visible = CGRect(origin: .zero, size: bounds.size)
+            var hit = local.intersection(visible)
+            guard hit.width >= 2, hit.height >= 2 else { continue }
+            hit = hit.integral.intersection(visible)
+            guard hit.width >= 2, hit.height >= 2 else { continue }
+            if bounds.contains(center) {
+                return (display.id, hit)
+            }
+            if fallback == nil { fallback = (display.id, hit) }
+        }
+        if let fallback = fallback {
+            return (fallback.0, fallback.1)
         }
         return nil
     }

@@ -44,7 +44,7 @@ final class ScreenRecorder: NSObject {
     private let writerQueue = DispatchQueue(label: "com.maosrec.writer", qos: .userInitiated)
     private let cameraQueue = DispatchQueue(label: "com.maosrec.camera", qos: .userInitiated)
     private let cameraLock = NSLock()
-    private let ciContext = CIContext(options: [.cacheIntermediates: false])
+    private lazy var ciContext = CIContext(options: [.cacheIntermediates: false])
 
     private var writer: AVAssetWriter?
     private var videoInput: AVAssetWriterInput?
@@ -168,8 +168,10 @@ final class ScreenRecorder: NSObject {
         do {
             assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
         } catch {
+            try? FileManager.default.removeItem(at: outputURL)
             throw RecorderError.cannotCreateWriter(error.localizedDescription)
         }
+        writer = assetWriter
 
         let compression: [String: Any] = [
             AVVideoAverageBitRateKey: configuration.quality.bitrate,
@@ -186,45 +188,45 @@ final class ScreenRecorder: NSObject {
         ]
         let newVideoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         newVideoInput.expectsMediaDataInRealTime = true
-        guard assetWriter.canAdd(newVideoInput) else { throw RecorderError.cannotCreateWriter("H.264 encoder is unavailable.") }
-        assetWriter.add(newVideoInput)
 
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-            assetWriterInput: newVideoInput,
-            sourcePixelBufferAttributes: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-                kCVPixelBufferWidthKey as String: width,
-                kCVPixelBufferHeightKey as String: height,
-                kCVPixelBufferIOSurfacePropertiesKey as String: [:]
-            ]
-        )
+        do {
+            guard assetWriter.canAdd(newVideoInput) else { throw RecorderError.cannotCreateWriter("H.264 encoder is unavailable.") }
+            assetWriter.add(newVideoInput)
 
-        var newAudioInput: AVAssetWriterInput?
-        if configuration.audioDevice != nil {
-            let settings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 44_100,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderBitRateKey: 64_000
-            ]
-            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
-            input.expectsMediaDataInRealTime = true
-            if assetWriter.canAdd(input) {
+            let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+                assetWriterInput: newVideoInput,
+                sourcePixelBufferAttributes: [
+                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                    kCVPixelBufferWidthKey as String: width,
+                    kCVPixelBufferHeightKey as String: height,
+                    kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+                ]
+            )
+
+            var newAudioInput: AVAssetWriterInput?
+            if configuration.audioDevice != nil {
+                let settings: [String: Any] = [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: 44_100,
+                    AVNumberOfChannelsKey: 1,
+                    AVEncoderBitRateKey: 64_000
+                ]
+                let input = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
+                input.expectsMediaDataInRealTime = true
+                guard assetWriter.canAdd(input) else { throw RecorderError.microphoneUnavailable }
                 assetWriter.add(input)
                 newAudioInput = input
             }
-        }
 
-        writer = assetWriter
-        videoInput = newVideoInput
-        audioInput = newAudioInput
-        pixelAdaptor = adaptor
-
-        do {
+            videoInput = newVideoInput
+            audioInput = newAudioInput
+            pixelAdaptor = adaptor
             try configureScreenSession(configuration: configuration, scale: scale)
             try configureCameraSession(device: configuration.cameraDevice)
         } catch {
+            writer?.cancelWriting()
             clearState()
+            try? FileManager.default.removeItem(at: outputURL)
             throw error
         }
 
@@ -241,10 +243,14 @@ final class ScreenRecorder: NSObject {
         writerQueue.async { [weak self] in
             guard let self = self, let writer = self.writer else { return }
             guard self.startedWriting else {
+                let url = self.outputURL
                 writer.cancelWriting()
-                let error = writer.error ?? RecorderError.cannotCreateWriter("No video frames were captured.")
-                DispatchQueue.main.async { self.delegate?.recorder(self, didFail: error) }
                 self.clearState()
+                if let url = url {
+                    try? FileManager.default.removeItem(at: url)
+                }
+                let error = RecorderError.cannotCreateWriter("No video frames were captured.")
+                DispatchQueue.main.async { self.delegate?.recorder(self, didFail: error) }
                 return
             }
             self.videoInput?.markAsFinished()
@@ -277,8 +283,22 @@ final class ScreenRecorder: NSObject {
         }
         screenInput.minFrameDuration = CMTime(value: 1, timescale: CMTimeScale(configuration.quality.fps))
         screenInput.scaleFactor = scale
+        // cropRect is stored in display points. The capture buffer is in pixels.
         if let crop = configuration.cropRect, crop.width >= 2, crop.height >= 2 {
-            screenInput.cropRect = crop
+            let bounds = CGDisplayBounds(configuration.displayID)
+            let pixelsWide = CGFloat(CGDisplayPixelsWide(configuration.displayID))
+            let pixelsHigh = CGFloat(CGDisplayPixelsHigh(configuration.displayID))
+            let backing = bounds.width > 0 ? pixelsWide / bounds.width : 1
+            let requested = CGRect(
+                x: crop.origin.x * backing,
+                y: crop.origin.y * backing,
+                width: crop.width * backing,
+                height: crop.height * backing
+            )
+            let visible = requested.intersection(CGRect(x: 0, y: 0, width: pixelsWide, height: pixelsHigh))
+            if visible.width >= 2, visible.height >= 2 {
+                screenInput.cropRect = visible
+            }
         }
         screenInput.capturesCursor = configuration.capturesCursor
         screenInput.capturesMouseClicks = false
@@ -324,6 +344,7 @@ final class ScreenRecorder: NSObject {
     }
 
     private func appendVideo(_ sampleBuffer: CMSampleBuffer) {
+        guard !isStopping else { return }
         guard let source = CMSampleBufferGetImageBuffer(sampleBuffer),
               let writer = writer,
               let videoInput = videoInput,
@@ -425,11 +446,17 @@ final class ScreenRecorder: NSObject {
     }
 
     private func appendAudio(_ sampleBuffer: CMSampleBuffer) {
-        guard startedWriting, let input = audioInput, input.isReadyForMoreMediaData else { return }
+        guard !isStopping, startedWriting, let input = audioInput, input.isReadyForMoreMediaData else { return }
         var duration = CMSampleBufferGetDuration(sampleBuffer)
         if !duration.isNumeric || duration.seconds <= 0 || duration.seconds > 0.5 {
             let samples = max(CMSampleBufferGetNumSamples(sampleBuffer), 1)
-            duration = CMTime(value: CMTimeValue(samples), timescale: 44_100)
+            var timescale: CMTimeScale = 44_100
+            if let format = CMSampleBufferGetFormatDescription(sampleBuffer),
+               let stream = CMAudioFormatDescriptionGetStreamBasicDescription(format),
+               stream.pointee.mSampleRate > 0 {
+                timescale = CMTimeScale(stream.pointee.mSampleRate.rounded())
+            }
+            duration = CMTime(value: CMTimeValue(samples), timescale: timescale)
         }
         let time = timeline.audioTime(
             for: CMSampleBufferGetPresentationTimeStamp(sampleBuffer),
@@ -453,11 +480,19 @@ final class ScreenRecorder: NSObject {
     }
 
     private func fail(_ error: Error) {
-        screenSession.stopRunning()
-        cameraSession?.stopRunning()
+        // stopRunning waits for the sample callback to finish, so it must not
+        // run on the capture queue or the session can deadlock.
+        let camera = cameraSession
+        let url = outputURL
+        let removeFile = !startedWriting
         writer?.cancelWriting()
         clearState()
+        if removeFile, let url = url {
+            try? FileManager.default.removeItem(at: url)
+        }
         DispatchQueue.main.async { [weak self] in
+            self?.screenSession.stopRunning()
+            camera?.stopRunning()
             guard let self = self else { return }
             self.delegate?.recorder(self, didFail: error)
         }
@@ -484,36 +519,35 @@ final class ScreenRecorder: NSObject {
 /// Screen-capture buffers sometimes begin at time zero and then jump to the
 /// host clock (hours since boot). Writing those values unchanged holds the
 /// first frame for hours. A forward jump larger than `maxGap` is treated as a
-/// broken clock and the file timeline stays continuous.
+/// broken clock and the file timeline stays continuous. Video and audio share
+/// one epoch so a track that starts later stays aligned with the other.
 private final class RecordingTimeline {
-    private var videoEpoch: CMTime?
-    private var audioEpoch: CMTime?
+    private var epoch: CMTime?
     private var lastVideo = CMTime.invalid
     private var lastAudio = CMTime.invalid
     private let maxGap: Double = 30
 
     func reset() {
-        videoEpoch = nil
-        audioEpoch = nil
+        epoch = nil
         lastVideo = .invalid
         lastAudio = .invalid
     }
 
     func videoTime(for source: CMTime, frameDuration: CMTime) -> CMTime {
-        let result = map(source, step: frameDuration, epoch: videoEpoch, last: lastVideo)
-        videoEpoch = result.epoch
+        let result = map(source, step: frameDuration, last: lastVideo)
+        epoch = result.epoch
         lastVideo = result.time
         return result.time
     }
 
     func audioTime(for source: CMTime, duration: CMTime) -> CMTime {
-        let result = map(source, step: duration, epoch: audioEpoch, last: lastAudio)
-        audioEpoch = result.epoch
+        let result = map(source, step: duration, last: lastAudio)
+        epoch = result.epoch
         lastAudio = result.time
         return result.time
     }
 
-    private func map(_ source: CMTime, step: CMTime, epoch: CMTime?, last: CMTime) -> (time: CMTime, epoch: CMTime?) {
+    private func map(_ source: CMTime, step: CMTime, last: CMTime) -> (time: CMTime, epoch: CMTime?) {
         let advance = (step.isNumeric && step.seconds > 0) ? step : CMTime(value: 1, timescale: 600)
         let sourceIsUsable = source.isNumeric && source.seconds.isFinite
         var output: CMTime
