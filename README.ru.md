@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.png" width="128" height="128" alt="Логотип Maos Record">
+</p>
+
 # Maos Record — руководство пользователя
 
 [English version](README.en.md) · [Главная страница](README.md) · [Скачать последнюю версию](../../releases/latest)

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" width="128" height="128" alt="Maos Record logo">
+  <img src="docs/assets/logo.png" width="128" height="128" alt="Maos Record logo">
 </p>
 
 <h1 align="center">Maos Record</h1>
