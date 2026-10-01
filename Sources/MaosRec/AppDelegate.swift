@@ -7,7 +7,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = nil
-        NSApp.applicationIconImage = AppIcon.make()
         buildMenu()
         mainWindowController = MainWindowController()
         mainWindowController.showWindow(nil)
